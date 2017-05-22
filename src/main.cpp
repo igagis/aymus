@@ -8,9 +8,7 @@
 
 
 
-struct SinePlayer : public audout::Listener{
-//	double time = 0;
-
+struct AudioPlayer : public audout::Listener{
 	audout::AudioFormat format;
 	
 	ayemu_vtx_t *vtx;
@@ -30,21 +28,20 @@ struct SinePlayer : public audout::Listener{
 		for (
 				auto i = buf.begin(), e = buf.end();
 				i != e && this->pos < vtx->frames;
-				++this->pos
 			)
 		{
-			ayemu_ay_reg_frame_t regs;
-			ayemu_vtx_getframe (this->vtx, this->pos, regs);
-			ayemu_set_regs (&this->ay, regs);
-			ayemu_gen_sound (&this->ay, &*this->audioBuf.begin(), this->audioBuf.size());
+			if(this->srcIter == this->audioBuf.end()){
+				ayemu_ay_reg_frame_t regs;
+				ayemu_vtx_getframe (this->vtx, this->pos, regs);
+				ayemu_set_regs (&this->ay, regs);
+				ayemu_gen_sound (&this->ay, &*this->audioBuf.begin(), this->audioBuf.size());
+				this->srcIter = this->audioBuf.begin();
+				++this->pos;
+			}
 			
 			ASSERT_INFO(this->audioBuf.size() % 2 == 0, "this->audioBuf.size() = " << this->audioBuf.size())
 			
-			for(; i != e; ++i){
-				if(this->srcIter == this->audioBuf.end()){
-					this->srcIter = this->audioBuf.begin();
-					break;
-				}
+			for(; i != e && this->srcIter != this->audioBuf.end(); ++i){
 				ASSERT(this->srcIter != this->audioBuf.end())
 				ASSERT(this->srcIter + 1 != this->audioBuf.end())
 				*i = std::int16_t(utki::deserialize16LE(&*this->srcIter));
@@ -58,7 +55,7 @@ struct SinePlayer : public audout::Listener{
 //		TRACE(<< "this->smpBuf = " << buf << std::endl)
 	}
 	
-	SinePlayer(audout::AudioFormat format) :
+	AudioPlayer(audout::AudioFormat format) :
 			format(format)
 	{
 		if((this->vtx = ayemu_vtx_load_from_file("dizzy5.vtx"))){}else{
@@ -73,7 +70,7 @@ struct SinePlayer : public audout::Listener{
 		size_t audio_bufsize = this->format.frequency() * this->format.numChannels() * 2 / this->vtx->playerFreq;
 		audio_bufsize += audio_bufsize % 2;
 		this->audioBuf.resize(audio_bufsize);
-		this->srcIter = this->audioBuf.begin();
+		this->srcIter = this->audioBuf.end();
 		
 		ayemu_init(&this->ay);
 		if(!ayemu_set_sound_format(&this->ay, this->format.frequency(), this->format.numChannels(), 16)){
@@ -90,13 +87,13 @@ struct SinePlayer : public audout::Listener{
 		}
 	}
 	
-	~SinePlayer()noexcept{
+	~AudioPlayer()noexcept{
 		ayemu_vtx_free(this->vtx);
 	}
 };
 
 void play(audout::AudioFormat format){
-	SinePlayer pl(format);
+	AudioPlayer pl(format);
 	audout::Player p(format, 1000, &pl);
 	p.setPaused(false);
 
@@ -105,11 +102,11 @@ void play(audout::AudioFormat format){
 
 
 int main(int argc, char *argv[]){
-	{
-		TRACE_ALWAYS(<< "Opening audio playback device: Mono 11025" << std::endl)
-		play(audout::AudioFormat(audout::Frame_e::MONO, audout::SamplingRate_e::HZ_11025));
-		TRACE_ALWAYS(<< "finished playing" << std::endl)
-	}
+//	{
+//		TRACE_ALWAYS(<< "Opening audio playback device: Mono 11025" << std::endl)
+//		play(audout::AudioFormat(audout::Frame_e::MONO, audout::SamplingRate_e::HZ_11025));
+//		TRACE_ALWAYS(<< "finished playing" << std::endl)
+//	}
 	
 //	{
 //		TRACE_ALWAYS(<< "Opening audio playback device: Stereo 11025" << std::endl)
